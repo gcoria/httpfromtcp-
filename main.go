@@ -5,38 +5,59 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
+	"net"
 	"strings"
 )
 
-const inputFilePath = "messages.txt"
+type Config struct {
+	Network string
+	Port    string
+}
+
+var config = Config{
+	Network: "tcp",
+	Port:    ":42069",
+}
 
 func main() {
-	f, err := os.Open(inputFilePath)
+	listener, err := net.Listen(config.Network, config.Port)
 	if err != nil {
-		log.Fatalf("could not open %s: %s\n", inputFilePath, err)
+		log.Fatalf("could not listen on %s: %s\n", config.Port, err)
 	}
+	defer listener.Close()
 
-	fmt.Printf("Reading data from %s\n", inputFilePath)
+	fmt.Printf("TCP server listening on %s\n", config.Port)
 	fmt.Println("=====================================")
 
-	linesChannel := getLinesChannel(f)
-	for line := range linesChannel {
-		fmt.Printf("read: %s\n", line)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Printf("error accepting connection: %s\n", err.Error())
+			continue
+		}
+
+		fmt.Println("Connection accepted")
+
+		linesChannel := getLinesChannel(conn)
+		for line := range linesChannel {
+			fmt.Println(line)
+		}
+
+		fmt.Println("Connection closed")
 	}
 }
 
-func getLinesChannel(f io.ReadCloser) <-chan string {
+func getLinesChannel(r io.ReadCloser) <-chan string {
 	lines := make(chan string)
 
 	go func() {
-		defer f.Close()
+		defer r.Close()
 		defer close(lines)
 
 		currentLineContents := ""
 		for {
 			buffer := make([]byte, 8)
-			n, err := f.Read(buffer)
+			n, err := r.Read(buffer)
 			if err != nil {
 				if currentLineContents != "" {
 					lines <- currentLineContents
