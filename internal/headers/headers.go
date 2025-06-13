@@ -8,6 +8,22 @@ import (
 
 const crlf = "\r\n"
 
+// isValidHeaderKey checks if the header key contains only valid characters according to HTTP spec
+func isValidHeaderKey(key string) bool {
+	for _, c := range key {
+		if (c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') ||
+			(c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' ||
+				c == '*' || c == '+' || c == '-' || c == '.' || c == '^' || c == '_' ||
+				c == '`' || c == '|' || c == '~') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 type Headers map[string]string
 
 func NewHeaders() Headers {
@@ -36,6 +52,9 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	value := bytes.TrimSpace(parts[1])
 	key = strings.TrimSpace(key)
+	if !isValidHeaderKey(key) {
+		return 0, false, fmt.Errorf("invalid header name: contains invalid characters: %s", key)
+	}
 
 	h.Set(key, string(value))
 	return idx + 2, false, nil
