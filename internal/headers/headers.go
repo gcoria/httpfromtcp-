@@ -61,5 +61,9 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 }
 
 func (h Headers) Set(key, value string) {
-	h[key] = value
+	if existingValue, exists := h[key]; exists {
+		h[key] = existingValue + ", " + value
+	} else {
+		h[key] = value
+	}
 }
