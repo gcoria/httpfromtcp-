@@ -44,6 +44,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	parts := bytes.SplitN(data[:idx], []byte(":"), 2)
+	if len(parts) != 2 {
+		return 0, false, fmt.Errorf("malformed header: missing colon")
+	}
+
 	key := string(parts[0])
 
 	if key != strings.TrimRight(key, " ") {
@@ -56,7 +60,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("invalid header name: contains invalid characters: %s", key)
 	}
 
-	h.Set(key, string(value))
+	h.Set(strings.ToLower(key), string(value))
 	return idx + 2, false, nil
 }
 
