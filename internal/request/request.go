@@ -13,6 +13,7 @@ import (
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 
 	state requestState
 }
@@ -28,6 +29,7 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -35,11 +37,12 @@ const crlf = "\r\n"
 const bufferSize = 8
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	buf := make([]byte, bufferSize, bufferSize)
+	buf := make([]byte, bufferSize)
 	readToIndex := 0
 	req := &Request{
 		state:   requestStateInitialized,
 		Headers: headers.NewHeaders(),
+		Body:    []byte{},
 	}
 	for req.state != requestStateDone {
 		if readToIndex >= len(buf) {
@@ -161,9 +164,49 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, nil
 		}
 		if done {
-			r.state = requestStateDone
+			r.state = requestStateParsingBody
 		}
 		return n, nil
+	case requestStateParsingBody:
+		contentLength := r.Headers.Get("Content-Length")
+		if contentLength == "" {
+			// No Content-Length header, assume no body
+			r.state = requestStateDone
+			return 0, nil
+		}
+
+		// Parse Content-Length value
+		var expectedLength int
+		_, err := fmt.Sscanf(contentLength, "%d", &expectedLength)
+		if err != nil {
+			return 0, fmt.Errorf("invalid Content-Length header: %s", contentLength)
+		}
+
+		// Calculate how much more we need
+		remaining := expectedLength - len(r.Body)
+		if remaining <= 0 {
+			// Body is already complete
+			r.state = requestStateDone
+			return 0, nil
+		}
+
+		// Check if we have more data than expected
+		if len(data) > remaining {
+			// We have more data than we need - this is an error
+			// Append what we need to see the full body length
+			r.Body = append(r.Body, data[:remaining]...)
+			return 0, fmt.Errorf("body length (%d) exceeds Content-Length (%d)", len(r.Body), expectedLength)
+		}
+
+		// Append all available data to body
+		r.Body = append(r.Body, data...)
+
+		// Check if body is complete
+		if len(r.Body) == expectedLength {
+			r.state = requestStateDone
+		}
+
+		return len(data), nil
 	case requestStateDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
