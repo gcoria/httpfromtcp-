@@ -28,6 +28,12 @@ func handler(w *response.Writer, req *request.Request) {
 		return
 	}
 
+	// Handle video endpoint
+	if target == "/video" {
+		handleVideo(w)
+		return
+	}
+
 	var statusCode response.StatusCode
 	var htmlBody string
 
@@ -86,6 +92,44 @@ func handler(w *response.Writer, req *request.Request) {
 
 	// Write body
 	_, err = w.WriteBody([]byte(htmlBody))
+	if err != nil {
+		return
+	}
+}
+
+func handleVideo(w *response.Writer) {
+	// Read the video file
+	videoData, err := os.ReadFile("assets/vim.mp4")
+	if err != nil {
+		// Write error response
+		w.WriteStatusLine(response.StatusInternalServerError)
+		errorHeaders := headers.NewHeaders()
+		errorHeaders.Set("Connection", "close")
+		w.WriteHeaders(errorHeaders)
+		w.WriteBody([]byte("Error reading video file: " + err.Error()))
+		return
+	}
+
+	// Write status line
+	err = w.WriteStatusLine(response.StatusOK)
+	if err != nil {
+		return
+	}
+
+	// Create headers with Content-Type set to video/mp4
+	videoHeaders := headers.NewHeaders()
+	videoHeaders.Set("Content-Length", fmt.Sprintf("%d", len(videoData)))
+	videoHeaders.Set("Connection", "close")
+	videoHeaders.SetOverride("Content-Type", "video/mp4")
+
+	// Write headers
+	err = w.WriteHeaders(videoHeaders)
+	if err != nil {
+		return
+	}
+
+	// Write body
+	_, err = w.WriteBody(videoData)
 	if err != nil {
 		return
 	}
