@@ -75,3 +75,8 @@ func (h Headers) Set(key, value string) {
 func (h Headers) Get(key string) string {
 	return h[strings.ToLower(key)]
 }
+
+// SetOverride sets a header value, replacing any existing value instead of appending
+func (h Headers) SetOverride(key, value string) {
+	h[strings.ToLower(key)] = value
+}
